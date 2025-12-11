@@ -15,7 +15,7 @@ st.markdown("""
 <style>
     .stApp {background-color: #0e1117;}
     .title-animate {
-        font-size: 80px; font-weight: bold; text-align: center;
+        font-size: 60px; font-weight: bold; text-align: center;
         background: -webkit-linear-gradient(#eee, #333);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -32,6 +32,9 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     .stButton button {width: 100%;}
+    .auto-tag {
+        font-size:12px; background:#333; padding:2px 8px; border-radius:10px; color:#aaa; margin-left:10px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -41,7 +44,6 @@ def parse_cost(cost_str):
     if match: return int(match.group(1).replace(",", ""))
     return 0
 
-# --- AUTH ---
 if 'user' not in st.session_state:
     if "user" in st.query_params:
         st.session_state['user'] = st.query_params["user"]
@@ -54,8 +56,9 @@ if 'user' not in st.session_state:
 if st.session_state['page'] == 'splash':
     empty = st.empty()
     with empty.container():
-        st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
+        st.markdown("<br><br><br>", unsafe_allow_html=True)
         st.markdown('<p class="title-animate">WANDERLUST AI</p>', unsafe_allow_html=True)
+        st.markdown("<center>Your AI-Powered Travel Architect</center>", unsafe_allow_html=True)
     time.sleep(2)
     empty.empty()
     st.session_state['page'] = 'login'
@@ -65,24 +68,24 @@ if st.session_state['page'] == 'splash':
 elif st.session_state['page'] == 'login':
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
-        st.title("✈️ Login")
-        tab1, tab2 = st.tabs(["Sign In", "Register"])
+        st.title("✈️ Start Journey")
+        tab1, tab2 = st.tabs(["Login", "Sign Up"])
         with tab1:
-            u = st.text_input("User")
-            p = st.text_input("Pass", type="password")
-            if st.button("Go", type="primary"):
+            u = st.text_input("Username")
+            p = st.text_input("Password", type="password")
+            if st.button("Login", type="primary"):
                 if check_login(u, p):
                     st.session_state['user'] = u
                     st.session_state['page'] = 'home'
                     st.query_params["user"] = u
                     st.rerun()
-                else: st.error("Fail")
+                else: st.error("Invalid credentials")
         with tab2:
-            nu = st.text_input("New User")
-            np = st.text_input("New Pass", type="password")
-            if st.button("Create"):
-                if add_user(nu, np): st.success("Created!")
-                else: st.error("Taken")
+            nu = st.text_input("New Username")
+            np = st.text_input("New Password", type="password")
+            if st.button("Create Account"):
+                if add_user(nu, np): st.success("Created! Login now.")
+                else: st.error("Username taken.")
 
 # --- HOME ---
 elif st.session_state['page'] == 'home':
@@ -98,7 +101,7 @@ elif st.session_state['page'] == 'home':
         for row in get_history(st.session_state['user']):
             tid, dest, djson, note, date_c = row
             with st.expander(f"{dest}"):
-                if st.button("Load", key=f"l_{tid}"):
+                if st.button("View Plan", key=f"l_{tid}"):
                     st.session_state['trip_data'] = json.loads(djson)
                     st.rerun()
 
@@ -114,61 +117,72 @@ elif st.session_state['page'] == 'home':
             fd = st.selectbox("Confirm", get_place_suggestions(rd), index=0) if rd and get_place_suggestions(rd) else rd
             
         c3, c4, c5 = st.columns(3)
-        sd = c3.date_input("Start")
-        dur = c4.slider("Days", 1, 10, 3)
-        bud_type = c5.select_slider("Style", ["Cheap", "Mid", "Lux"], value="Mid")
+        sd = c3.date_input("Start Date")
+        dur = c4.slider("Duration (Days)", 1, 10, 3)
         
-        c6, c7, c8 = st.columns(3)
-        # NEW: TRAVELERS & TRIP TYPE
-        travelers = c6.number_input("Travelers", min_value=1, max_value=20, value=1)
-        trip_type = c7.selectbox("Trip Type", ["Solo", "Couple", "Family", "Friends", "Business"])
-        max_budget = c8.number_input("Max Total Budget (₹)", 5000, 1000000, 20000, 1000)
+        # --- AUTO-BUDGET LOGIC ---
+        # No more slider. We calculate style from the Max Budget amount.
+        max_budget = c5.number_input("Total Trip Budget (₹)", 5000, 2000000, 20000, 1000)
         
-        # EXPANDED INTERESTS
-        intr = st.multiselect("Interests", 
-                              ["Food", "Nature", "History", "Adventure", "Shopping", 
-                               "Nightlife", "Art & Museums", "Relaxation", "Hidden Gems", 
-                               "Photography", "Wellness & Spa", "Local Culture"], 
-                              ["Food", "Nature"])
+        if max_budget < 30000:
+            bud_type = "Cheap"
+            bud_icon = "🎒 Backpacker Style"
+        elif max_budget < 100000:
+            bud_type = "Mid"
+            bud_icon = "⚖️ Standard Comfort"
+        else:
+            bud_type = "Lux"
+            bud_icon = "💎 Luxury Experience"
+            
+        # Show the detected style to the user
+        c5.markdown(f"**Detected Style:** {bud_icon}")
+
+        c6, c7 = st.columns(2)
+        travelers = c6.number_input("Travelers", 1, 10, 1)
+        trip_type = c7.selectbox("Trip Type", ["Solo", "Couple", "Family", "Friends"])
         
-        if st.button("🚀 Generate Journey", type="primary"):
+        intr = st.multiselect("Interests", ["Food", "Nature", "History", "Adventure", "Nightlife", "Shopping", "Relaxation"], ["Food"])
+        
+        if st.button("🚀 Generate Itinerary", type="primary"):
             if fd and fo:
-                with st.spinner("Analyzing routes & generating plan..."):
+                with st.spinner("Analyzing routes, costs, and places..."):
                     configure_genai()
                     st.session_state['selected_activities'] = {}
-                    # Pass new params to AI
+                    
+                    # 1. AI (or Static Fallback) - Passing the AUTO DETECTED 'bud_type'
                     trip_data = generate_itinerary(fd, sd, dur, bud_type, max_budget, travelers, trip_type, intr)
+                    
+                    # 2. Logistics (Math)
                     logistics = get_trip_logistics(fo, fd)
                     
                     if "error" not in trip_data:
                         save_trip(st.session_state['user'], fd, trip_data)
                         st.session_state['trip_data'] = trip_data
                         st.session_state['logistics'] = logistics
-                        st.session_state['travelers_count'] = travelers # Save for display
+                        st.session_state['travelers'] = travelers
                         st.rerun()
-                    else: st.error(trip_data['error'])
+                    else: st.error("System Busy. Try again.")
 
     # --- RESULTS ---
     if 'trip_data' in st.session_state:
         data = st.session_state['trip_data']
         logistics = st.session_state.get('logistics')
-        travelers_count = st.session_state.get('travelers_count', 1)
+        travelers_count = st.session_state.get('travelers', 1)
         
         st.divider()
         st.header(data.get('trip_title', f"Trip to {fd}"))
         
-        # LOGISTICS PANEL
+        # LOGISTICS
         if logistics:
-            st.subheader("✈️ Travel Estimates (One-Way)")
+            st.subheader("✈️ Travel Options (Estimated)")
             lc1, lc2, lc3, lc4 = st.columns(4)
-            # Display logic: Flights/Train usually per person, Car total.
-            with lc1: st.markdown(f"<div class='transport-card'>✈️ <b>Flight</b><br>₹{logistics['costs']['flight']['inr']:,}<br><small>{logistics['times']['flight']} (Per Person)</small></div>", unsafe_allow_html=True)
-            with lc2: st.markdown(f"<div class='transport-card'>🚆 <b>Train</b><br>₹{logistics['costs']['train']['inr']:,}<br><small>{logistics['times']['train']} (Per Person)</small></div>", unsafe_allow_html=True)
-            with lc3: st.markdown(f"<div class='transport-card'>🚌 <b>Bus</b><br>₹{logistics['costs']['bus']['inr']:,}<br><small>Economy (Per Person)</small></div>", unsafe_allow_html=True)
-            with lc4: st.markdown(f"<div class='transport-card'>🚗 <b>Car</b><br>₹{logistics['costs']['car']['inr']:,}<br><small>{logistics['times']['car']} (Total Vehicle)</small></div>", unsafe_allow_html=True)
-            st.info(f"📍 Distance: **{logistics['distance_km']:,} km**")
+            with lc1: st.markdown(f"<div class='transport-card'>✈️ <b>Flight</b><br>₹{logistics['costs']['flight']['inr']:,}<br><small>{logistics['times']['flight']}</small></div>", unsafe_allow_html=True)
+            with lc2: st.markdown(f"<div class='transport-card'>🚆 <b>Train</b><br>₹{logistics['costs']['train']['inr']:,}<br><small>{logistics['times']['train']}</small></div>", unsafe_allow_html=True)
+            with lc3: st.markdown(f"<div class='transport-card'>🚌 <b>Bus</b><br>₹{logistics['costs']['bus']['inr']:,}<br><small>Economy</small></div>", unsafe_allow_html=True)
+            with lc4: st.markdown(f"<div class='transport-card'>🚗 <b>Car</b><br>₹{logistics['costs']['car']['inr']:,}<br><small>{logistics['times']['car']}</small></div>", unsafe_allow_html=True)
+            st.caption(f"📍 Distance: {logistics['distance_km']:,} km")
 
-        # BUDGET TRACKER
+        # BUDGET
         if 'selected_activities' not in st.session_state: st.session_state['selected_activities'] = {}
         curr_total = 0
         for day in data.get('days', []):
@@ -177,31 +191,31 @@ elif st.session_state['page'] == 'home':
                 if key not in st.session_state['selected_activities']: st.session_state['selected_activities'][key] = True
                 if st.session_state['selected_activities'][key]: curr_total += parse_cost(act.get('cost'))
         
-        delta = max_budget - curr_total
-        budget_status = "over-budget" if delta < 0 else "under-budget"
+        # Ensure we don't divide by zero if max_budget is missing somehow
+        safe_budget = max_budget if 'max_budget' in locals() else 50000
         
-        # NEW: PER PERSON CALCULATION
+        delta = safe_budget - curr_total
+        status = "over-budget" if delta < 0 else "under-budget"
         per_person = int(curr_total / travelers_count)
         
         c_head, c_cost = st.columns([3, 1])
         with c_cost:
              st.markdown(f"""
-             <div class='cost-card {budget_status}'>
+             <div class='cost-card {status}'>
                 <h3>₹{curr_total:,}</h3>
-                <p>Total Spend / ₹{max_budget:,}</p>
-                <div style='border-top:1px solid #444; margin-top:5px; padding-top:5px;'>
-                    <b>₹{per_person:,}</b> per person
-                </div>
+                <p>Total / ₹{safe_budget:,}</p>
+                <hr style='border-color:#444;'>
+                <b>₹{per_person:,}</b> / person
              </div>
              """, unsafe_allow_html=True)
 
-        # MAP
+        # MAP (Unblockable Embed)
         if fo and fd:
             embed_url = f"https://maps.google.com/maps?saddr={fo.replace(' ','+')}&daddr={fd.replace(' ','+')}&output=embed"
             components.iframe(src=embed_url, height=400)
 
         # ITINERARY
-        st.subheader("📅 Schedule")
+        st.subheader("📅 Your Schedule")
         for day in data.get('days', []):
             with st.expander(f"Day {day['day']}", expanded=(day['day']==1)):
                 for idx, act in enumerate(day['activities']):
@@ -215,14 +229,14 @@ elif st.session_state['page'] == 'home':
                     c3.markdown(f"<div style='opacity:{op}'><b>{act.get('cost')}</b></div>", unsafe_allow_html=True)
 
         # RECOMMENDATIONS
-        st.subheader("💎 Recommendations")
-        t1, t2 = st.tabs(["Hotels", "Food"])
+        st.subheader("💎 Smart Recommendations")
+        t1, t2, t3 = st.tabs(["Hotels", "Food", "AI Chat"])
         with t1:
             for h in data.get('hotel_recommendations', []):
                 with st.container(border=True):
                     c1, c2 = st.columns([3, 1])
                     c1.markdown(f"**{h.get('name')}**")
-                    c1.caption(f"📍 {h.get('location')}")
+                    c1.caption(f"📍 {h.get('location')} | ⭐ {h.get('rating', '4.5')}")
                     c2.markdown(f"**{h.get('price_per_night')}**")
                     search = f"{h.get('name')} {fd.split(',')[0]} hotel"
                     c2.link_button("Map", f"https://www.google.com/maps/search/?api=1&query={search.replace(' ','+')}")
@@ -235,3 +249,7 @@ elif st.session_state['page'] == 'home':
                     c2.markdown(f"**{f.get('price')}**")
                     search = f"{f.get('name')} {fd.split(',')[0]} food"
                     c2.link_button("Map", f"https://www.google.com/maps/search/?api=1&query={search.replace(' ','+')}")
+        with t3:
+            st.write("Ask questions about this trip:")
+            q = st.text_input("Example: Is it safe at night?")
+            if q: st.info(ask_travel_bot([], f"Context: {str(data)}. Q: {q}"))
