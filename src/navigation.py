@@ -2,10 +2,10 @@ import requests
 import streamlit as st
 from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
-import random
+import math
 
-# Unique User Agent to prevent blocking
-geolocator = Nominatim(user_agent="wanderlust_pro_v4_final", timeout=10)
+# Unique user agent to prevent blocking
+geolocator = Nominatim(user_agent="wanderlust_final_pro_v7", timeout=10)
 
 @st.cache_data(ttl=3600)
 def get_place_suggestions(user_input):
@@ -13,60 +13,62 @@ def get_place_suggestions(user_input):
     try:
         url = "https://nominatim.openstreetmap.org/search"
         params = {'q': user_input, 'format': 'json', 'addressdetails': 1, 'limit': 5}
-        headers = {'User-Agent': "wanderlust_pro_v4_final"}
-        response = requests.get(url, params=params, headers=headers, timeout=5)
-        suggestions = []
-        for item in response.json():
-            if item.get('display_name') not in suggestions:
-                suggestions.append(item.get('display_name'))
-        return suggestions
+        headers = {'User-Agent': "wanderlust_final_pro_v7"}
+        res = requests.get(url, params=params, headers=headers, timeout=2)
+        return [i.get('display_name') for i in res.json()]
     except:
         return []
 
 @st.cache_data(ttl=3600)
 def get_coordinates(place_name):
     try:
-        location = geolocator.geocode(place_name)
-        if location:
-            return location.latitude, location.longitude
-    except:
-        pass
+        loc = geolocator.geocode(place_name)
+        if loc: return loc.latitude, loc.longitude
+    except: pass
     return None
+
+def calculate_costs(dist_km):
+    """
+    Returns realistic costs based on distance logic.
+    """
+    # Base rates: Fixed base price + Cost per KM
+    flight_usd = 80 + (dist_km * 0.12)
+    train_usd = 15 + (dist_km * 0.05)
+    bus_usd = 10 + (dist_km * 0.03)
+    car_usd = 40 + (dist_km * 0.15) 
+
+    return {
+        "flight": {"usd": int(flight_usd), "inr": int(flight_usd * 84)},
+        "train": {"usd": int(train_usd), "inr": int(train_usd * 84)},
+        "bus": {"usd": int(bus_usd), "inr": int(bus_usd * 84)},
+        "car": {"usd": int(car_usd), "inr": int(car_usd * 84)}
+    }
 
 @st.cache_data(ttl=3600)
 def get_trip_logistics(origin, destination):
-    """
-    Calculates Distance, Time, AND Estimated Travel Costs for different modes.
-    """
-    start_coords = get_coordinates(origin)
-    end_coords = get_coordinates(destination)
+    c1 = get_coordinates(origin)
+    c2 = get_coordinates(destination)
     
-    if not start_coords or not end_coords:
+    if not c1 or not c2:
         return None
 
-    # 1. Calculate Distance (Geodesic - accurate "crow flies", adding 20% for road curvature)
-    dist_km = geodesic(start_coords, end_coords).km
-    road_dist = int(dist_km * 1.2) 
+    # 1. Distance Calculation (Guaranteed)
+    dist_km = int(geodesic(c1, c2).km)
     
-    # 2. Estimate Costs (USD & INR)
-    # Rates: Flight ~$0.15/km, Car ~$0.10/km, Train ~$0.04/km
-    costs = {
-        "flight": {"usd": int(dist_km * 0.12 + 50), "inr": int((dist_km * 0.12 + 50) * 84)},
-        "car": {"usd": int(road_dist * 0.10), "inr": int((road_dist * 0.10) * 84)},
-        "train": {"usd": int(road_dist * 0.04), "inr": int((road_dist * 0.04) * 84)},
-        "bus": {"usd": int(road_dist * 0.03), "inr": int((road_dist * 0.03) * 84)}
-    }
-    
-    # 3. Estimate Time
-    times = {
-        "flight": f"{int(dist_km/800 + 2)}h (Flight)", # +2h for airport time
-        "car": f"{int(road_dist/70)}h {int((road_dist%70)/1.2)}m (Drive)",
-        "train": f"{int(road_dist/80)}h (Train)"
-    }
+    # 2. Travel Time Estimates
+    flight_time = f"{max(1, int(dist_km/800)+2)}h"
+    train_time = f"{max(1, int(dist_km/70))}h"
+    drive_time = f"{int(dist_km/60)}h"
+
+    # 3. Cost Calculation
+    costs = calculate_costs(dist_km)
 
     return {
-        "distance_km": road_dist,
-        "coords": [start_coords, end_coords],
+        "distance_km": dist_km,
         "costs": costs,
-        "times": times
+        "times": {
+            "flight": flight_time,
+            "train": train_time,
+            "car": drive_time
+        }
     }
