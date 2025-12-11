@@ -7,7 +7,7 @@
 > **Spellbound Coders Cup 2025 Submission** > *BE YOU*
 
 ---
-
+DEPLOYED LINK : https://wanderlust-spellbound-jykcpayi7y4grtcx9rypdt.streamlit.app/
 ## Table of Contents
 - [Problem Statement](#-problem-statement)
 - [Solution Overview](#-solution-overview)
