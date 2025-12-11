@@ -1,0 +1,23 @@
+{
+  "name": "wanderlust-ai-planner",
+  "version": "1.0.0",
+  "description": "Production Grade AI Travel Planner powered by Gemini & Groq",
+  "main": "app.py",
+  "scripts": {
+    "start": "streamlit run app.py",
+    "setup": "pip install -r requirements.txt",
+    "clean": "rm -rf __pycache__"
+  },
+  "keywords": [
+    "ai",
+    "travel",
+    "streamlit",
+    "gemini",
+    "python"
+  ],
+  "author": "Spellbound Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
