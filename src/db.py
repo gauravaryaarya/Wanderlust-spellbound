@@ -6,10 +6,8 @@ DB_NAME = "wanderlust.db"
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    # Users Table
     c.execute('''CREATE TABLE IF NOT EXISTS users
                  (username TEXT PRIMARY KEY, password TEXT)''')
-    # History Table
     c.execute('''CREATE TABLE IF NOT EXISTS history
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, 
                   destination TEXT, trip_data JSON, notes TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
@@ -38,7 +36,6 @@ def check_login(username, password):
 def save_trip(username, destination, trip_data):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-    # Save trip data as JSON string
     c.execute("INSERT INTO history (username, destination, trip_data, notes) VALUES (?, ?, ?, ?)", 
               (username, destination, json.dumps(trip_data), ""))
     conn.commit()
